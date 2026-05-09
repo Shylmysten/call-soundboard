@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Soundboard" />
+  <meta name="theme-color" content="#0f1117" />
+  <title>Call Soundboard</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --accent: #00e5a0;
+      --accent2: #ff6b6b;
+      --accent3: #ffd166;
+      --text: #f0f2ff;
+      --muted: #7a7f9a;
+      --border: rgba(255,255,255,0.07);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app {
+      max-width: 420px;
+      margin: 0 auto;
+      padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 32px);
+      min-height: 100vh;
+    }
+    header {
+      padding: 20px 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    .logo span { color: var(--text); }
+    .version {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Status card */
+    .status-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .status-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 0% 0%, rgba(0,229,160,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .status-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+    .dot.listening { background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: breathe 2s infinite; }
+    .dot.triggered { background: var(--accent2); box-shadow: 0 0 12px var(--accent2); }
+    @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+    .status-label {
+      font-size: 13px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+    }
+    .listen-btn {
+      padding: 10px 20px;
+      border-radius: 100px;
+      border: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--accent);
+      color: #0f1117;
+      letter-spacing: 0.5px;
+    }
+    .listen-btn:active { transform: scale(0.96); }
+    .listen-btn.active {
+      background: var(--accent2);
+      color: white;
+    }
+    .vol-wrap { margin-bottom: 12px; }
+    .vol-bar {
+      height: 3px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .vol-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.1s;
+      border-radius: 2px;
+    }
+    .transcript {
+      font-size: 12px;
+      color: var(--muted);
+      font-style: italic;
+      min-height: 18px;
+      font-family: 'Space Mono', monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Sections */
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Trigger cards */
+    .trigger-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+    .trigger-card:focus-within { border-color: rgba(0,229,160,0.3); }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .card-emoji {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .card-meta { flex: 1; }
+    .card-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .card-sub { font-size: 12px; color: var(--muted); }
+
+    /* Toggle */
+    .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: var(--surface2);
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: 1px solid var(--border);
+    }
+    .toggle-track::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 2px; top: 2px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: rgba(0,229,160,0.2); border-color: var(--accent); }
+    .toggle input:checked + .toggle-track::before { transform: translateX(18px); background: var(--accent); }
+
+    /* Form rows */
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .form-label {
+      font-size: 12px;
+      color: var(--muted);
+      width: 48px;
+      flex-shrink: 0;
+      font-family: 'Space Mono', monospace;
+    }
+    .form-input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: rgba(0,229,160,0.4); }
+    .form-select {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+      transition: border-color 0.2s;
+    }
+    .form-select:focus { border-color: rgba(0,229,160,0.4); }
+    .test-btn {
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--accent);
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .test-btn:active { transform: scale(0.95); background: rgba(0,229,160,0.1); }
+    .remove-btn {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: none;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .remove-btn:hover { color: var(--accent2); border-color: rgba(255,107,107,0.2); }
+
+    /* Silence slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .slider-row input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--surface2);
+      outline: none;
+      cursor: pointer;
+    }
+    .slider-row input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(0,229,160,0.4);
+    }
+    .slider-val {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      min-width: 30px;
+      text-align: right;
+    }
+
+    /* Add button */
+    .add-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px dashed rgba(0,229,160,0.25);
+      background: none;
+      color: var(--accent);
+      font-size: 14px;
+      font-family: 'Space Mono', monospace;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+      margin-top: 4px;
+    }
+    .add-btn:hover { background: rgba(0,229,160,0.05); border-color: rgba(0,229,160,0.4); }
+    .add-btn:active { transform: scale(0.98); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-family: 'Space Mono', monospace;
+      color: var(--text);
+      opacity: 0;
+      transition: all 0.25s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">call<span>board</span></div>
+    <div class="version">v1.0</div>
+  </header>
+
+  <!-- Status -->
+  <div class="status-card">
+    <div class="status-top">
+      <div class="status-indicator">
+        <div class="dot" id="dot"></div>
+        <span class="status-label" id="statusText">tap to start</span>
+      </div>
+      <button class="listen-btn" id="listenBtn" onclick="toggleListen()">▶ LISTEN</button>
+    </div>
+    <div class="vol-wrap">
+      <div class="vol-bar"><div class="vol-fill" id="volFill"></div></div>
+    </div>
+    <div class="transcript" id="transcript">—</div>
+  </div>
+
+  <!-- Silence trigger -->
+  <div class="section-label">Silence trigger</div>
+  <div class="trigger-card">
+    <div class="card-header">
+      <div class="card-emoji" id="silenceEmoji">🦗</div>
+      <div class="card-meta">
+        <div class="card-title">Crickets</div>
+        <div class="card-sub">Plays when nobody's talking</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="silenceEnabled" checked>
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <div class="slider-row">
+      <span class="form-label" style="width:auto;font-size:12px">After</span>
+      <input type="range" min="2" max="15" value="5" step="1" id="silenceThresh"
+        oninput="document.getElementById('silenceVal').textContent=this.value+'s'">
+      <span class="slider-val" id="silenceVal">5s</span>
+      <span class="form-label" style="width:auto;font-size:12px">silence</span>
+    </div>
+    <div class="form-row">
+      <span class="form-label">Sound</span>
+      <select class="form-select" id="silenceSound" onchange="updateSilenceEmoji()">
+        <option value="crickets">🦗 Crickets</option>
+        <option value="tumbleweed">🌵 Tumbleweed wind</option>
+        <option value="awkward">😬 Awkward violin</option>
+        <option value="elevator">🎵 Elevator music</option>
+      </select>
+      <button class="test-btn" onclick="playSoundByKey(document.getElementById('silenceSound').value)">▶ test</button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-label">Word triggers</div>
+  <div id="triggerList"></div>
+  <button class="add-btn" onclick="addTrigger()">+ add trigger</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+const SOUNDS = {
+  crickets:   { emoji:'🦗',  freq:[800,900,850,800],          type:'square',   dur:0.08 },
+  tumbleweed: { emoji:'🌵',  freq:[200,150,180,140],          type:'sawtooth', dur:0.2  },
+  awkward:    { emoji:'😬',  freq:[440,415,460,392],          type:'sawtooth', dur:0.22 },
+  elevator:   { emoji:'🎵',  freq:[523,587,659,523],          type:'sine',     dur:0.2  },
+  darth:      { emoji:'🌑',  freq:[196,196,196,156,233,196,156,233,196], type:'square', dur:0.22 },
+  rock:       { emoji:'🎸',  freq:[110,165,220,165,138,165,110], type:'sawtooth', dur:0.15 },
+  airhorn:    { emoji:'📯',  freq:[440,880,1320,880],         type:'square',   dur:0.15 },
+  success:    { emoji:'🎉',  freq:[523,659,784,1046],         type:'triangle', dur:0.18 },
+  sad:        { emoji:'😢',  freq:[311,277,247,233],          type:'sawtooth', dur:0.25 },
+  applause:   { emoji:'👏',  freq:[200,300,400,300,200,300],  type:'sine',     dur:0.1  },
+};
+
+let triggers = [
+  { id:1, phrase:'mother in law', sound:'darth',   enabled:true },
+  { id:2, phrase:'you rock',      sound:'rock',    enabled:true },
+  { id:3, phrase:'amazing',       sound:'success', enabled:true },
+];
+let nextId = 4;
+let isListening = false;
+let recognition = null;
+let audioCtx = null;
+let silenceTimer = null;
+let lastSoundTime = 0;
+const COOLDOWN = 4000;
+
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freqs, type, dur) {
+  const ctx = getCtx();
+  const now = ctx.currentTime;
+  freqs.forEach((freq, i) => {
+    if (!freq) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.15, now + i * dur);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + i * dur + dur * 0.9);
+    osc.start(now + i * dur);
+    osc.stop(now + i * dur + dur);
+  });
+}
+
+function playSoundByKey(key) {
+  const s = SOUNDS[key];
+  if (!s) return;
+  playTone(s.freq, s.type, s.dur);
+  showToast(s.emoji + ' ' + key);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function updateSilenceEmoji() {
+  const key = document.getElementById('silenceSound').value;
+  document.getElementById('silenceEmoji').textContent = SOUNDS[key]?.emoji || '🔊';
+}
+
+function renderTriggers() {
+  const list = document.getElementById('triggerList');
+  list.innerHTML = '';
+  triggers.forEach(tr => {
+    const opts = Object.entries(SOUNDS).map(([k,v]) =>
+      `<option value="${k}"${tr.sound===k?' selected':''}>${v.emoji} ${k}</option>`
+    ).join('');
+    const card = document.createElement('div');
+    card.className = 'trigger-card';
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-emoji">${SOUNDS[tr.sound]?.emoji||'🔊'}</div>
+        <div class="card-meta">
+          <div class="card-title">Phrase trigger</div>
+          <div class="card-sub">${tr.phrase || 'set a phrase below'}</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${tr.enabled?'checked':''} onchange="setEnabled(${tr.id},this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="form-row">
+        <span class="form-label">Phrase</span>
+        <input class="form-input" type="text" value="${tr.phrase}"
+          placeholder="e.g. you rock"
+          oninput="setPhrase(${tr.id},this.value);this.closest('.trigger-card').querySelector('.card-sub').textContent=this.value||'set a phrase below'" />
+      </div>
+      <div class="form-row">
+        <span class="form-label">Sound</span>
+        <select class="form-select" onchange="setSound(${tr.id},this.value,this)">${opts}</select>
+        <button class="test-btn" onclick="playSoundByKey('${tr.sound}')">▶ test</button>
+      </div>
+      <button class="remove-btn" onclick="removeTrigger(${tr.id})">✕ remove</button>`;
+    list.appendChild(card);
+  });
+}
+
+function setEnabled(id, val) { const t = triggers.find(t=>t.id===id); if(t) t.enabled=val; }
+function setPhrase(id, val)   { const t = triggers.find(t=>t.id===id); if(t) t.phrase=val.toLowerCase().trim(); }
+function setSound(id, val, el) {
+  const t = triggers.find(t=>t.id===id);
+  if (t) {
+    t.sound = val;
+    const card = el.closest('.trigger-card');
+    card.querySelector('.card-emoji').textContent = SOUNDS[val]?.emoji || '🔊';
+    card.querySelector('.test-btn').setAttribute('onclick', `playSoundByKey('${val}')`);
+  }
+}
+function removeTrigger(id) { triggers = triggers.filter(t=>t.id!==id); renderTriggers(); }
+function addTrigger() {
+  triggers.push({ id:nextId++, phrase:'', sound:'airhorn', enabled:true });
+  renderTriggers();
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.trigger-card');
+    cards[cards.length-1]?.querySelector('input[type=text]')?.focus();
+  }, 50);
+}
+
+function checkTranscript(text) {
+  const lower = text.toLowerCase();
+  document.getElementById('transcript').textContent = '"' + text + '"';
+  const now = Date.now();
+  if (now - lastSoundTime < COOLDOWN) return;
+  for (const tr of triggers) {
+    if (!tr.enabled || !tr.phrase) continue;
+    if (lower.includes(tr.phrase)) {
+      playSoundByKey(tr.sound);
+      lastSoundTime = now;
+      setStatus('triggered', 'triggered: ' + tr.phrase);
+      setTimeout(() => setStatus('listening', 'listening...'), 3000);
+      return;
+    }
+  }
+}
+
+function resetSilenceTimer() {
+  clearTimeout(silenceTimer);
+  if (!document.getElementById('silenceEnabled').checked) return;
+  const secs = parseInt(document.getElementById('silenceThresh').value) * 1000;
+  silenceTimer = setTimeout(() => {
+    const now = Date.now();
+    if (now - lastSoundTime < COOLDOWN) return;
+    playSoundByKey(document.getElementById('silenceSound').value);
+    lastSoundTime = now;
+    setStatus('triggered', 'silence detected!');
+    setTimeout(() => { if(isListening) setStatus('listening','listening...'); }, 3500);
+  }, secs);
+}
+
+function setStatus(state, msg) {
+  const dot = document.getElementById('dot');
+  dot.className = 'dot' + (state !== 'off' ? ' ' + state : '');
+  document.getElementById('statusText').textContent = msg;
+}
+
+function toggleListen() {
+  isListening ? stopListening() : startListening();
+}
+
+function startListening() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('Speech recognition not supported'); return; }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  recognition.onstart = () => {
+    isListening = true;
+    setStatus('listening', 'listening...');
+    const btn = document.getElementById('listenBtn');
+    btn.textContent = '■ STOP';
+    btn.classList.add('active');
+    resetSilenceTimer();
+  };
+  recognition.onresult = (e) => {
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+    }
+    if (final) { checkTranscript(final); resetSilenceTimer(); }
+    document.getElementById('volFill').style.width = (60 + Math.random()*40) + '%';
+    setTimeout(() => document.getElementById('volFill').style.width = '0%', 200);
+  };
+  recognition.onspeechstart = resetSilenceTimer;
+  recognition.onend = () => { if (isListening) recognition.start(); };
+  recognition.onerror = (e) => {
+    if (e.error === 'not-allowed') showToast('Mic permission denied');
+  };
+  recognition.start();
+}
+
+function stopListening() {
+  isListening = false;
+  clearTimeout(silenceTimer);
+  if (recognition) recognition.stop();
+  setStatus('off', 'tap to start');
+  const btn = document.getElementById('listenBtn');
+  btn.textContent = '▶ LISTEN';
+  btn.classList.remove('active');
+  document.getElementById('transcript').textContent = '—';
+  document.getElementById('volFill').style.width = '0%';
+}
+
+renderTriggers();
+</script>
+</body>
+</html>
